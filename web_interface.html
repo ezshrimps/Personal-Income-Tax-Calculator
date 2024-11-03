@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Income Tax Calculator</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -30,79 +31,46 @@
 </head>
 <body>
     <div class="container">
-        <h2>Import XML File and Calculate Income Tax</h2>
+        <h2>Import Excel File and Calculate Income Tax</h2>
         <div class="form-group">
-            <input type="file" id="fileInput" accept=".xml">
+            <input type="file" id="fileInput" accept=".xls,.xlsx">
         </div>
-        <button onclick="importXML()">Import and Calculate</button>
-        <button onclick="exportXML()" style="margin-left: 20px;">Export Result as XML</button>
+        <button onclick="importExcel()">Import and Calculate</button>
+        <button onclick="exportExcel()" style="margin-left: 20px;">Export Result as Excel</button>
         <h3 id="output"></h3>
     </div>
 
     <script>
         let parsedData = null;
 
-        function importXML() {
+        function importExcel() {
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
 
             if (!file) {
-                alert("Please select an XML file.");
+                alert("Please select an Excel file.");
                 return;
             }
 
             const reader = new FileReader();
             reader.onload = function(event) {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
-                parsedData = parseXMLData(xmlDoc);
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                parsedData = XLSX.utils.sheet_to_json(sheet);
                 displayCalculation(parsedData);
             };
-            reader.readAsText(file);
-        }
-
-        function parseXMLData(xmlDoc) {
-            const records = [];
-            const rows = xmlDoc.getElementsByTagName("row");
-
-            for (let row of rows) {
-                const record = {
-                    department: row.getElementsByTagName("部门")[0].textContent,
-                    baseSalary: parseFloat(row.getElementsByTagName("岗位工资")[0].textContent),
-                    bonusBase: parseFloat(row.getElementsByTagName("奖金基数")[0].textContent),
-                    floatingSalary1: parseFloat(row.getElementsByTagName("其它浮动工资1")[0].textContent),
-                    basicBenefitSalary: parseFloat(row.getElementsByTagName("基本效益工资")[0].textContent),
-                    fixedSalary: parseFloat(row.getElementsByTagName("其它固定工资")[0].textContent),
-                    floatingSalary2: parseFloat(row.getElementsByTagName("其它浮动工资2")[0].textContent),
-                    monthlyPrePerformance: parseFloat(row.getElementsByTagName("月预发绩效工资")[0].textContent),
-                    annualBonus: parseFloat(row.getElementsByTagName("年度绩效奖（一次性）")[0].textContent),
-                    subsidy: parseFloat(row.getElementsByTagName("生活性补贴")[0].textContent),
-                    oneChildCareFee: parseFloat(row.getElementsByTagName("独生子女保健费")[0].textContent),
-                    housingFund: parseFloat(row.getElementsByTagName("住房公积金")[0].textContent),
-                    carSubsidy: parseFloat(row.getElementsByTagName("车改补贴")[0].textContent),
-                    totalPayable: parseFloat(row.getElementsByTagName("应发合计")[0].textContent),
-                    pensionBase: parseFloat(row.getElementsByTagName("养老金基数")[0].textContent),
-                    medicalInsuranceBase: parseFloat(row.getElementsByTagName("医保金基数")[0].textContent),
-                    pensionDeduction: parseFloat(row.getElementsByTagName("代扣养老保险")[0].textContent),
-                    medicalDeduction: parseFloat(row.getElementsByTagName("代扣医疗保险")[0].textContent),
-                    housingFundDeduction: parseFloat(row.getElementsByTagName("代扣住房公积金")[0].textContent),
-                    averageMonthlyIncomeLastYear: parseFloat(row.getElementsByTagName("去年月均收入")[0].textContent),
-                    taxableIncome: parseFloat(row.getElementsByTagName("应税收入")[0].textContent),
-                    taxDeduction: parseFloat(row.getElementsByTagName("代扣税")[0].textContent),
-                    yearEndTaxDeduction: parseFloat(row.getElementsByTagName("年终奖扣税")[0].textContent),
-                    personalAnnuityDeduction: parseFloat(row.getElementsByTagName("代扣个人年金")[0].textContent),
-                    actualPayment: parseFloat(row.getElementsByTagName("实发合计")[0].textContent)
-                };
-                records.push(record);
-            }
-            return records;
+            reader.readAsArrayBuffer(file);
         }
 
         function displayCalculation(records) {
             let output = "";
             records.forEach((record, index) => {
-                const incomeTax = calculateTax(record.taxableIncome);
-                output += `Employee ${index + 1} - Department: ${record.department}, Calculated Income Tax: ${incomeTax.toFixed(2)} RMB<br>`;
+                const taxableIncome = parseFloat(record['应税收入']);
+                const incomeTax = calculateTax(taxableIncome);
+                record['Calculated Tax'] = incomeTax.toFixed(2);
+                output += `Employee ${index + 1} - Department: ${record['部门']}, Calculated Income Tax: ${incomeTax.toFixed(2)} RMB<br>`;
             });
             document.getElementById('output').innerHTML = output;
         }
@@ -135,30 +103,17 @@
             return annualTax / 12;  // Convert annual tax to monthly
         }
 
-        function exportXML() {
+        function exportExcel() {
             if (!parsedData) {
                 alert("Please import and calculate before exporting.");
                 return;
             }
 
-            let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<results>\n';
+            const ws = XLSX.utils.json_to_sheet(parsedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Tax Results");
 
-            parsedData.forEach((record, index) => {
-                const incomeTax = calculateTax(record.taxableIncome);
-                xmlContent += `  <employee id="${index + 1}">\n`;
-                xmlContent += `    <department>${record.department}</department>\n`;
-                xmlContent += `    <calculatedTax>${incomeTax.toFixed(2)}</calculatedTax>\n`;
-                xmlContent += `  </employee>\n`;
-            });
-
-            xmlContent += '</results>';
-
-            const blob = new Blob([xmlContent], { type: 'application/xml' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'tax_results.xml';
-            link.click();
+            XLSX.writeFile(wb, 'tax_results.xlsx');
         }
     </script>
 </body>
