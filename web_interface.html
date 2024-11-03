@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Tax Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Employee Tax Calculator</h2>
+    <form id="taxForm">
+        <div class="form-group">
+            <label for="monthlyIncome">Monthly Income (RMB)</label>
+            <input type="number" id="monthlyIncome" required>
+        </div>
+        <div class="form-group">
+            <label for="socialSecurity">Social Security (RMB)</label>
+            <input type="number" id="socialSecurity" required>
+        </div>
+        <div class="form-group">
+            <label for="housingFund">Housing Fund (RMB)</label>
+            <input type="number" id="housingFund" required>
+        </div>
+        <div class="form-group">
+            <label for="numChildren">Number of Children</label>
+            <input type="number" id="numChildren" min="0" required>
+        </div>
+        <div class="form-group">
+            <label for="educationDeduction">Education Deduction (RMB)</label>
+            <input type="number" id="educationDeduction" required>
+        </div>
+        <div class="form-group">
+            <label for="medicalExpenses">Medical Expenses (RMB)</label>
+            <input type="number" id="medicalExpenses" required>
+        </div>
+        <div class="form-group">
+            <label for="mortgageInterest">Mortgage Interest (RMB)</label>
+            <input type="number" id="mortgageInterest" required>
+        </div>
+        <div class="form-group">
+            <label for="rent">Rent (RMB)</label>
+            <input type="number" id="rent" required>
+        </div>
+        <div class="form-group">
+            <label for="elderlySupport">Elderly Support (RMB)</label>
+            <input type="number" id="elderlySupport" required>
+        </div>
+        <div class="form-group">
+            <label for="isOnlyChild">Are you an only child?</label>
+            <input type="checkbox" id="isOnlyChild">
+        </div>
+        <button type="button" onclick="calculateTax()">Calculate Tax</button>
+    </form>
+    <h3 id="result"></h3>
+</div>
+
+<script>
+    function calculateTax() {
+        const monthlyIncome = parseFloat(document.getElementById('monthlyIncome').value);
+        const socialSecurity = parseFloat(document.getElementById('socialSecurity').value);
+        const housingFund = parseFloat(document.getElementById('housingFund').value);
+        const numChildren = parseInt(document.getElementById('numChildren').value, 10);
+        const educationDeduction = parseFloat(document.getElementById('educationDeduction').value);
+        const medicalExpenses = parseFloat(document.getElementById('medicalExpenses').value);
+        const mortgageInterest = parseFloat(document.getElementById('mortgageInterest').value);
+        const rent = parseFloat(document.getElementById('rent').value);
+        const elderlySupport = parseFloat(document.getElementById('elderlySupport').value);
+        const isOnlyChild = document.getElementById('isOnlyChild').checked;
+
+        // Tax calculation logic
+        const threshold = 5000;
+        const childrenDeduction = 1000 * numChildren;
+        const medicalDeduction = medicalExpenses > 15000 ? Math.min(medicalExpenses - 15000, 80000) : 0;
+        const elderlyDeduction = isOnlyChild ? 2000 : Math.min(elderlySupport, 1000);
+
+        const taxableIncome = monthlyIncome - threshold - socialSecurity - housingFund - childrenDeduction - educationDeduction - medicalDeduction - mortgageInterest - rent - elderlyDeduction;
+
+        if (taxableIncome <= 0) {
+            document.getElementById('result').innerText = 'Your monthly tax is: 0 RMB';
+            return;
+        }
+
+        const taxBrackets = [
+            { limit: 36000, rate: 0.03, quickDeduction: 0 },
+            { limit: 144000, rate: 0.10, quickDeduction: 2520 },
+            { limit: 300000, rate: 0.20, quickDeduction: 16920 },
+            { limit: 420000, rate: 0.25, quickDeduction: 31920 },
+            { limit: 660000, rate: 0.30, quickDeduction: 52920 },
+            { limit: 960000, rate: 0.35, quickDeduction: 85920 },
+            { limit: Infinity, rate: 0.45, quickDeduction: 181920 }
+        ];
+
+        const annualTaxableIncome = taxableIncome * 12;
+        let taxRate, deduction;
+
+        for (let bracket of taxBrackets) {
+            if (annualTaxableIncome <= bracket.limit) {
+                taxRate = bracket.rate;
+                deduction = bracket.quickDeduction;
+                break;
+            }
+        }
+
+        const annualTax = annualTaxableIncome * taxRate - deduction;
+        const monthlyTax = annualTax / 12;
+
+        document.getElementById('result').innerText = `Your monthly tax is: ${monthlyTax.toFixed(2)} RMB`;
+    }
+</script>
+
+</body>
+</html>
+
+
