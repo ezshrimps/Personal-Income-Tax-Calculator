@@ -3,27 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Tax Calculator</title>
+    <title>Personal Income Tax Calculator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
         }
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: auto;
         }
         .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
+            margin-bottom: 20px;
         }
         button {
             padding: 10px 20px;
@@ -38,110 +29,137 @@
     </style>
 </head>
 <body>
+    <div class="container">
+        <h2>Import XML File and Calculate Income Tax</h2>
+        <div class="form-group">
+            <input type="file" id="fileInput" accept=".xml">
+        </div>
+        <button onclick="importXML()">Import and Calculate</button>
+        <button onclick="exportXML()" style="margin-left: 20px;">Export Result as XML</button>
+        <h3 id="output"></h3>
+    </div>
 
-<div class="container">
-    <h2>Employee Tax Calculator</h2>
-    <form id="taxForm">
-        <div class="form-group">
-            <label for="monthlyIncome">Monthly Income (RMB)</label>
-            <input type="number" id="monthlyIncome" required>
-        </div>
-        <div class="form-group">
-            <label for="socialSecurity">Social Security (RMB)</label>
-            <input type="number" id="socialSecurity" required>
-        </div>
-        <div class="form-group">
-            <label for="housingFund">Housing Fund (RMB)</label>
-            <input type="number" id="housingFund" required>
-        </div>
-        <div class="form-group">
-            <label for="numChildren">Number of Children</label>
-            <input type="number" id="numChildren" min="0" required>
-        </div>
-        <div class="form-group">
-            <label for="educationDeduction">Education Deduction (RMB)</label>
-            <input type="number" id="educationDeduction" required>
-        </div>
-        <div class="form-group">
-            <label for="medicalExpenses">Medical Expenses (RMB)</label>
-            <input type="number" id="medicalExpenses" required>
-        </div>
-        <div class="form-group">
-            <label for="mortgageInterest">Mortgage Interest (RMB)</label>
-            <input type="number" id="mortgageInterest" required>
-        </div>
-        <div class="form-group">
-            <label for="rent">Rent (RMB)</label>
-            <input type="number" id="rent" required>
-        </div>
-        <div class="form-group">
-            <label for="elderlySupport">Elderly Support (RMB)</label>
-            <input type="number" id="elderlySupport" required>
-        </div>
-        <div class="form-group">
-            <label for="isOnlyChild">Are you an only child?</label>
-            <input type="checkbox" id="isOnlyChild">
-        </div>
-        <button type="button" onclick="calculateTax()">Calculate Tax</button>
-    </form>
-    <h3 id="result"></h3>
-</div>
+    <script>
+        let parsedData = null;
 
-<script>
-    function calculateTax() {
-        const monthlyIncome = parseFloat(document.getElementById('monthlyIncome').value);
-        const socialSecurity = parseFloat(document.getElementById('socialSecurity').value);
-        const housingFund = parseFloat(document.getElementById('housingFund').value);
-        const numChildren = parseInt(document.getElementById('numChildren').value, 10);
-        const educationDeduction = parseFloat(document.getElementById('educationDeduction').value);
-        const medicalExpenses = parseFloat(document.getElementById('medicalExpenses').value);
-        const mortgageInterest = parseFloat(document.getElementById('mortgageInterest').value);
-        const rent = parseFloat(document.getElementById('rent').value);
-        const elderlySupport = parseFloat(document.getElementById('elderlySupport').value);
-        const isOnlyChild = document.getElementById('isOnlyChild').checked;
+        function importXML() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
 
-        // Tax calculation logic
-        const threshold = 5000;
-        const childrenDeduction = 1000 * numChildren;
-        const medicalDeduction = medicalExpenses > 15000 ? Math.min(medicalExpenses - 15000, 80000) : 0;
-        const elderlyDeduction = isOnlyChild ? 2000 : Math.min(elderlySupport, 1000);
-
-        const taxableIncome = monthlyIncome - threshold - socialSecurity - housingFund - childrenDeduction - educationDeduction - medicalDeduction - mortgageInterest - rent - elderlyDeduction;
-
-        if (taxableIncome <= 0) {
-            document.getElementById('result').innerText = 'Your monthly tax is: 0 RMB';
-            return;
-        }
-
-        const taxBrackets = [
-            { limit: 36000, rate: 0.03, quickDeduction: 0 },
-            { limit: 144000, rate: 0.10, quickDeduction: 2520 },
-            { limit: 300000, rate: 0.20, quickDeduction: 16920 },
-            { limit: 420000, rate: 0.25, quickDeduction: 31920 },
-            { limit: 660000, rate: 0.30, quickDeduction: 52920 },
-            { limit: 960000, rate: 0.35, quickDeduction: 85920 },
-            { limit: Infinity, rate: 0.45, quickDeduction: 181920 }
-        ];
-
-        const annualTaxableIncome = taxableIncome * 12;
-        let taxRate, deduction;
-
-        for (let bracket of taxBrackets) {
-            if (annualTaxableIncome <= bracket.limit) {
-                taxRate = bracket.rate;
-                deduction = bracket.quickDeduction;
-                break;
+            if (!file) {
+                alert("Please select an XML file.");
+                return;
             }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
+                parsedData = parseXMLData(xmlDoc);
+                displayCalculation(parsedData);
+            };
+            reader.readAsText(file);
         }
 
-        const annualTax = annualTaxableIncome * taxRate - deduction;
-        const monthlyTax = annualTax / 12;
+        function parseXMLData(xmlDoc) {
+            const records = [];
+            const rows = xmlDoc.getElementsByTagName("row");
 
-        document.getElementById('result').innerText = `Your monthly tax is: ${monthlyTax.toFixed(2)} RMB`;
-    }
-</script>
+            for (let row of rows) {
+                const record = {
+                    department: row.getElementsByTagName("部门")[0].textContent,
+                    baseSalary: parseFloat(row.getElementsByTagName("岗位工资")[0].textContent),
+                    bonusBase: parseFloat(row.getElementsByTagName("奖金基数")[0].textContent),
+                    floatingSalary1: parseFloat(row.getElementsByTagName("其它浮动工资1")[0].textContent),
+                    basicBenefitSalary: parseFloat(row.getElementsByTagName("基本效益工资")[0].textContent),
+                    fixedSalary: parseFloat(row.getElementsByTagName("其它固定工资")[0].textContent),
+                    floatingSalary2: parseFloat(row.getElementsByTagName("其它浮动工资2")[0].textContent),
+                    monthlyPrePerformance: parseFloat(row.getElementsByTagName("月预发绩效工资")[0].textContent),
+                    annualBonus: parseFloat(row.getElementsByTagName("年度绩效奖（一次性）")[0].textContent),
+                    subsidy: parseFloat(row.getElementsByTagName("生活性补贴")[0].textContent),
+                    oneChildCareFee: parseFloat(row.getElementsByTagName("独生子女保健费")[0].textContent),
+                    housingFund: parseFloat(row.getElementsByTagName("住房公积金")[0].textContent),
+                    carSubsidy: parseFloat(row.getElementsByTagName("车改补贴")[0].textContent),
+                    totalPayable: parseFloat(row.getElementsByTagName("应发合计")[0].textContent),
+                    pensionBase: parseFloat(row.getElementsByTagName("养老金基数")[0].textContent),
+                    medicalInsuranceBase: parseFloat(row.getElementsByTagName("医保金基数")[0].textContent),
+                    pensionDeduction: parseFloat(row.getElementsByTagName("代扣养老保险")[0].textContent),
+                    medicalDeduction: parseFloat(row.getElementsByTagName("代扣医疗保险")[0].textContent),
+                    housingFundDeduction: parseFloat(row.getElementsByTagName("代扣住房公积金")[0].textContent),
+                    averageMonthlyIncomeLastYear: parseFloat(row.getElementsByTagName("去年月均收入")[0].textContent),
+                    taxableIncome: parseFloat(row.getElementsByTagName("应税收入")[0].textContent),
+                    taxDeduction: parseFloat(row.getElementsByTagName("代扣税")[0].textContent),
+                    yearEndTaxDeduction: parseFloat(row.getElementsByTagName("年终奖扣税")[0].textContent),
+                    personalAnnuityDeduction: parseFloat(row.getElementsByTagName("代扣个人年金")[0].textContent),
+                    actualPayment: parseFloat(row.getElementsByTagName("实发合计")[0].textContent)
+                };
+                records.push(record);
+            }
+            return records;
+        }
 
+        function displayCalculation(records) {
+            let output = "";
+            records.forEach((record, index) => {
+                const incomeTax = calculateTax(record.taxableIncome);
+                output += `Employee ${index + 1} - Department: ${record.department}, Calculated Income Tax: ${incomeTax.toFixed(2)} RMB<br>`;
+            });
+            document.getElementById('output').innerHTML = output;
+        }
+
+        function calculateTax(taxableIncome) {
+            if (taxableIncome <= 0) return 0;
+
+            const taxBrackets = [
+                { limit: 36000, rate: 0.03, quickDeduction: 0 },
+                { limit: 144000, rate: 0.10, quickDeduction: 2520 },
+                { limit: 300000, rate: 0.20, quickDeduction: 16920 },
+                { limit: 420000, rate: 0.25, quickDeduction: 31920 },
+                { limit: 660000, rate: 0.30, quickDeduction: 52920 },
+                { limit: 960000, rate: 0.35, quickDeduction: 85920 },
+                { limit: Infinity, rate: 0.45, quickDeduction: 181920 }
+            ];
+
+            const annualTaxableIncome = taxableIncome * 12;
+            let taxRate, quickDeduction;
+
+            for (let bracket of taxBrackets) {
+                if (annualTaxableIncome <= bracket.limit) {
+                    taxRate = bracket.rate;
+                    quickDeduction = bracket.quickDeduction;
+                    break;
+                }
+            }
+
+            const annualTax = annualTaxableIncome * taxRate - quickDeduction;
+            return annualTax / 12;  // Convert annual tax to monthly
+        }
+
+        function exportXML() {
+            if (!parsedData) {
+                alert("Please import and calculate before exporting.");
+                return;
+            }
+
+            let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<results>\n';
+
+            parsedData.forEach((record, index) => {
+                const incomeTax = calculateTax(record.taxableIncome);
+                xmlContent += `  <employee id="${index + 1}">\n`;
+                xmlContent += `    <department>${record.department}</department>\n`;
+                xmlContent += `    <calculatedTax>${incomeTax.toFixed(2)}</calculatedTax>\n`;
+                xmlContent += `  </employee>\n`;
+            });
+
+            xmlContent += '</results>';
+
+            const blob = new Blob([xmlContent], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'tax_results.xml';
+            link.click();
+        }
+    </script>
 </body>
 </html>
-
-
